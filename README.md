@@ -32,7 +32,7 @@ To use `Golink`, ensure the following tools are installed on your system:
    ```
 
 4. **Configure URLs:**
-   Place your URLs in `~/.dotfiles/urls.txt`. Each line should contain a keyword and a URL, optionally with a placeholder for search terms:
+   Place your URLs in `urls.txt` at the same directory of golink. Each line should contain a keyword and a URL, optionally with a placeholder for search terms:
    ```
    youtube https://www.youtube.com/results?search_query=
    github https://github.com/search?q=
