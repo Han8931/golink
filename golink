@@ -1,11 +1,72 @@
-# Set default browser
-browser="firefox"
+#!/bin/bash
+
+# Default configuration and file paths
+urls_file="$HOME/.dotfiles/urls.txt"
+config_file="$HOME/.dotfiles/golink_config"
+
+# Load existing configuration or set default
+load_config() {
+    if [ -f "$config_file" ]; then
+        source "$config_file"
+    else
+        # Default browser setting if configuration file does not exist
+        echo "browser=firefox" > "$config_file"
+        browser="firefox"
+    fi
+}
+
+# Save configuration settings
+save_config() {
+    echo "browser=$browser" > "$config_file"
+}
+
+# Function to add a new URL
+add_url() {
+    local name="$1"
+    local new_url="$2"
+    echo "$name $new_url" >> "$urls_file"
+    echo "Added $name with URL $new_url to $urls_file"
+}
+
+# Parse command line options
+while getopts ":a:b:" opt; do
+  case $opt in
+    a)
+      # Splitting the optarg to get name and url
+      IFS=' ' read -ra ADDR <<< "${OPTARG}"
+      if [ ${#ADDR[@]} -eq 2 ]; then
+        add_url "${ADDR[0]}" "${ADDR[1]}"
+      else
+        echo "Usage: -a 'name url'"
+        exit 1
+      fi
+      exit 0
+      ;;
+    b)
+      browser="${OPTARG}"
+      save_config  # Save new browser setting
+      ;;
+    \?)
+      echo "Invalid option: -$OPTARG" >&2
+      exit 1
+      ;;
+    :)
+      echo "Option -$OPTARG requires an argument." >&2
+      exit 1
+      ;;
+  esac
+done
+
+shift $((OPTIND-1))
+
+# Initialize configuration and browser choice
+load_config
 
 # Extract choices from urls.txt
-choices=$(awk '{printf "%s\\n", $1}' ~/.dotfiles/urls.txt | sed '$s/\\n$//')
+choices=$(awk '{print $1}' "$urls_file" | tr '\n' '\0')
 
 # Use dmenu to present choices to the user
-chosen=$(echo -e "$choices" | dmenu -i -p "Go to ...")
+chosen=$(echo -ne "$choices" | dmenu -i -p "Go to ...")
 
 # Ensure chosen is not empty
 if [ -z "$chosen" ]; then
@@ -14,40 +75,16 @@ if [ -z "$chosen" ]; then
 fi
 
 # Extract the URL corresponding to the chosen option
-url=$(awk -v chosen="$chosen" '$1 == chosen {print $2}' ~/.dotfiles/urls.txt)
-
-if [ -z "$url" ]; then
-    # If no URL was found, prompt the user to add a new one
-    echo "No URL found for choice: $chosen"
-    new_url=$(dmenu -p "Enter new URL for $chosen:")
-
-    # Check if the user entered a new URL
-    if [ -n "$new_url" ]; then
-        # Append the new choice and URL to urls.txt
-        echo "$chosen $new_url" >> ~/.dotfiles/urls.txt
-        url=$new_url
-    else
-        echo "No URL entered. Exiting."
-        exit 1
-    fi
-fi
+url=$(awk -v chosen="$chosen" '$1 == chosen {print $2}' "$urls_file")
 
 # Determine if the URL expects search terms by looking for "="
-if echo "$url" | grep -Eq "="; then
+if echo "$url" | grep -q "="; then
     # Prompt for search terms if applicable
     search_terms=$(dmenu -p "Enter search terms:")
-
-    if [ -n "$search_terms" ]; then
-        # Replace spaces with URL encoding or plus (+) as necessary for the URL structure
-        encoded_terms=$(echo "$search_terms" | sed -e 's/ /+/g')
-        full_url="${url}${encoded_terms}"
-    else
-        # No search terms provided, extract the base URL by removing everything after the last slash
-        base_url=$(echo "$url" | sed 's|/[^/]*$||')
-        full_url="$base_url/"
-    fi
+    encoded_terms=$(echo "$search_terms" | sed -e 's/ /+/g')
+    full_url="${url}${encoded_terms}"
 else
-    # If no search terms needed, use the base URL
+    # Use the base URL if no search terms needed
     full_url="$url"
 fi
 
